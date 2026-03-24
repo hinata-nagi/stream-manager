@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
-import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
+import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 
 type ActivityType = "配信" | "作業" | "休み";
 type StreamPlatform = "Twitch" | "YouTube" | "両方";
@@ -57,12 +57,13 @@ const emptyForm = () => ({
 type FilterType = "すべて" | ActivityType;
 
 export default function Home() {
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useUser();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("すべて");
   const [todayOnly, setTodayOnly] = useState(false);
@@ -139,8 +140,33 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function startDuplicate(a: Activity) {
+    setEditingId(null);
+    setIsDuplicating(true);
+    setForm({
+      date: a.date,
+      start_time: a.start_time,
+      end_time: a.end_time,
+      title: a.title,
+      type: a.type,
+      memo: a.memo ?? "",
+      stream_platform: a.stream_platform ?? "Twitch",
+      twitch_url: a.twitch_url ?? "",
+      youtube_url: a.youtube_url ?? "",
+      collab_partner: a.collab_partner ?? "",
+      announced: a.announced,
+      thumbnail_ready: a.thumbnail_ready,
+      thumbnail_path: "",
+    });
+    setThumbnailFile(null);
+    setError("");
+    setSuccess("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function cancelEdit() {
     setEditingId(null);
+    setIsDuplicating(false);
     setForm(emptyForm());
     setThumbnailFile(null);
     setError("");
@@ -184,6 +210,7 @@ export default function Home() {
 
       setSuccess(editingId ? "更新しました" : "保存しました");
       setEditingId(null);
+      setIsDuplicating(false);
       setForm(emptyForm());
       setThumbnailFile(null);
       await fetchActivities();
@@ -246,6 +273,30 @@ export default function Home() {
       return (a.start_time || "").localeCompare(b.start_time || "");
     });
 
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-sm text-gray-400">読み込み中...</p>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center max-w-sm w-full mx-4">
+          <h1 className="text-xl font-semibold text-gray-800 mb-2">活動管理</h1>
+          <p className="text-sm text-gray-500 mb-6">ログインしてご利用ください</p>
+          <SignInButton mode="modal">
+            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-md transition-colors">
+              ログイン
+            </button>
+          </SignInButton>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -267,7 +318,7 @@ export default function Home() {
         {/* Form */}
         <section className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-base font-semibold text-gray-700 mb-4">
-            {editingId ? "予定を編集" : "予定を追加"}
+            {editingId ? "予定を編集" : isDuplicating ? "複製して追加" : "予定を追加"}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -472,7 +523,7 @@ export default function Home() {
               >
                 {loading ? "保存中..." : editingId ? "更新" : "保存"}
               </button>
-              {editingId && (
+              {(editingId || isDuplicating) && (
                 <button
                   type="button"
                   onClick={cancelEdit}
@@ -608,6 +659,12 @@ export default function Home() {
                       className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
                     >
                       編集
+                    </button>
+                    <button
+                      onClick={() => startDuplicate(a)}
+                      className="text-xs text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 transition-colors"
+                    >
+                      複製
                     </button>
                     <button
                       onClick={() => setDeleteTargetId(a.id)}
