@@ -270,7 +270,7 @@ export default function Home() {
             {editingId ? "予定を編集" : "予定を追加"}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">日付 *</label>
                 <input
@@ -278,7 +278,7 @@ export default function Home() {
                   value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })}
                   required
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
@@ -286,7 +286,7 @@ export default function Home() {
                 <select
                   value={form.type}
                   onChange={(e) => setForm({ ...form, type: e.target.value as ActivityType })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option>配信</option>
                   <option>作業</option>
@@ -296,7 +296,7 @@ export default function Home() {
             </div>
 
             {form.type !== "休み" && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">開始時間 *</label>
                   <input
@@ -304,7 +304,7 @@ export default function Home() {
                     value={form.start_time}
                     onChange={(e) => setForm({ ...form, start_time: e.target.value })}
                     required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -314,7 +314,7 @@ export default function Home() {
                     value={form.end_time}
                     onChange={(e) => setForm({ ...form, end_time: e.target.value })}
                     required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -328,7 +328,7 @@ export default function Home() {
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 required
                 placeholder="例: 朝配信"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -360,7 +360,7 @@ export default function Home() {
                       value={form.twitch_url}
                       onChange={(e) => setForm({ ...form, twitch_url: e.target.value })}
                       placeholder="任意"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 )}
@@ -372,7 +372,7 @@ export default function Home() {
                       value={form.youtube_url}
                       onChange={(e) => setForm({ ...form, youtube_url: e.target.value })}
                       placeholder="任意"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 )}
@@ -383,7 +383,7 @@ export default function Home() {
                     value={form.collab_partner}
                     onChange={(e) => setForm({ ...form, collab_partner: e.target.value })}
                     placeholder="任意"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div className="flex gap-6">
@@ -457,7 +457,7 @@ export default function Home() {
                 onChange={(e) => setForm({ ...form, memo: e.target.value })}
                 rows={3}
                 placeholder="任意"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
 
@@ -636,7 +636,7 @@ export default function Home() {
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
                 placeholder="https://discord.com/api/webhooks/..."
-                className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
                 type="button"
