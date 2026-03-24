@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.0.6",
     "@libsql/client": "^0.14.0",
     "@vercel/blob": "^0.27.0",
     "next": "16.2.1",

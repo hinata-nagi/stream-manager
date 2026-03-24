@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
+import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
 
 type ActivityType = "配信" | "作業" | "休み";
 type StreamPlatform = "Twitch" | "YouTube" | "両方";
@@ -56,6 +57,7 @@ const emptyForm = () => ({
 type FilterType = "すべて" | ActivityType;
 
 export default function Home() {
+  const { isSignedIn } = useAuth();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -246,8 +248,19 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-800">活動管理</h1>
+        <div>
+          {isSignedIn ? (
+            <UserButton />
+          ) : (
+            <SignInButton mode="modal">
+              <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                ログイン
+              </button>
+            </SignInButton>
+          )}
+        </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
