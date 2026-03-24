@@ -1,4 +1,4 @@
-import { createClient, Row } from "@libsql/client";
+import { createClient, Row, InValue } from "@libsql/client";
 
 const client = createClient({
   url: process.env.TURSO_DATABASE_URL!,
@@ -174,7 +174,7 @@ export async function patchActivity(
 ): Promise<Activity | null> {
   await ensureDb();
   const fields: string[] = [];
-  const args: Record<string, unknown> = { id };
+  const args: Record<string, InValue> = { id };
   if (patch.announced !== undefined) {
     fields.push("announced = :announced");
     args.announced = patch.announced ? 1 : 0;
