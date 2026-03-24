@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import {
   getUpcomingStreamNotifications,
   getUpcomingPrepNotifications,
@@ -92,8 +93,10 @@ function buildPrepEmbed(a: Activity): object {
 }
 
 export async function POST(request: Request) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   try {
-    const webhookUrl = await getSetting("discord_webhook_url");
+    const webhookUrl = await getSetting("discord_webhook_url", userId);
     if (!webhookUrl) {
       return NextResponse.json({ skipped: true, reason: "webhook URL未設定" });
     }

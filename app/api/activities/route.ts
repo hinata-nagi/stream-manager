@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { getAllActivities, createActivity, ActivityInput, ActivityType, StreamPlatform } from "@/lib/db";
 
 export async function GET() {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   try {
-    const activities = await getAllActivities();
+    const activities = await getAllActivities(userId);
     return NextResponse.json(activities);
   } catch (error) {
     console.error(error);
@@ -12,6 +15,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   try {
     const body = await request.json();
     const { date, start_time, end_time, title, type, memo, stream_platform, twitch_url, youtube_url, collab_partner, announced, thumbnail_ready, thumbnail_path } = body;
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
       thumbnail_ready: isStream ? !!thumbnail_ready : false,
       thumbnail_path: isStream ? (thumbnail_path || undefined) : undefined,
     };
-    const activity = await createActivity(input);
+    const activity = await createActivity(input, userId);
     return NextResponse.json(activity, { status: 201 });
   } catch (error) {
     console.error(error);

@@ -49,6 +49,7 @@ async function ensureDb() {
     "ALTER TABLE activities ADD COLUMN youtube_url TEXT",
     "ALTER TABLE activities ADD COLUMN thumbnail_path TEXT",
     "ALTER TABLE activities ADD COLUMN notified_at TEXT",
+    "ALTER TABLE activities ADD COLUMN user_id TEXT NOT NULL DEFAULT ''",
   ]) {
     try { await client.execute(sql); } catch { /* column already exists */ }
   }
@@ -130,29 +131,30 @@ function inputArgs(input: ActivityInput, extra: Record<string, unknown> = {}) {
   };
 }
 
-export async function getAllActivities(): Promise<Activity[]> {
+export async function getAllActivities(userId: string): Promise<Activity[]> {
   await ensureDb();
-  const result = await client.execute(
-    "SELECT * FROM activities ORDER BY date DESC, start_time DESC"
-  );
+  const result = await client.execute({
+    sql: "SELECT * FROM activities WHERE user_id = ? ORDER BY date DESC, start_time DESC",
+    args: [userId],
+  });
   return result.rows.map(mapRow);
 }
 
-export async function createActivity(input: ActivityInput): Promise<Activity> {
+export async function createActivity(input: ActivityInput, userId: string): Promise<Activity> {
   await ensureDb();
   const result = await client.execute({
-    sql: `INSERT INTO activities (date, start_time, end_time, title, type, memo, stream_platform, twitch_url, youtube_url, collab_partner, announced, thumbnail_ready, thumbnail_path)
-          VALUES (:date, :start_time, :end_time, :title, :type, :memo, :stream_platform, :twitch_url, :youtube_url, :collab_partner, :announced, :thumbnail_ready, :thumbnail_path)`,
-    args: inputArgs(input),
+    sql: `INSERT INTO activities (date, start_time, end_time, title, type, memo, stream_platform, twitch_url, youtube_url, collab_partner, announced, thumbnail_ready, thumbnail_path, user_id)
+          VALUES (:date, :start_time, :end_time, :title, :type, :memo, :stream_platform, :twitch_url, :youtube_url, :collab_partner, :announced, :thumbnail_ready, :thumbnail_path, :user_id)`,
+    args: { ...inputArgs(input), user_id: userId },
   });
   const row = await client.execute({
-    sql: "SELECT * FROM activities WHERE id = ?",
-    args: [Number(result.lastInsertRowid)],
+    sql: "SELECT * FROM activities WHERE id = ? AND user_id = ?",
+    args: [Number(result.lastInsertRowid), userId],
   });
   return mapRow(row.rows[0]);
 }
 
-export async function updateActivity(id: number, input: ActivityInput): Promise<Activity | null> {
+export async function updateActivity(id: number, input: ActivityInput, userId: string): Promise<Activity | null> {
   await ensureDb();
   await client.execute({
     sql: `UPDATE activities
@@ -161,20 +163,21 @@ export async function updateActivity(id: number, input: ActivityInput): Promise<
               stream_platform = :stream_platform, twitch_url = :twitch_url, youtube_url = :youtube_url,
               collab_partner = :collab_partner, announced = :announced, thumbnail_ready = :thumbnail_ready,
               thumbnail_path = :thumbnail_path
-          WHERE id = :id`,
-    args: inputArgs(input, { id }),
+          WHERE id = :id AND user_id = :user_id`,
+    args: inputArgs(input, { id, user_id: userId }),
   });
-  const result = await client.execute({ sql: "SELECT * FROM activities WHERE id = ?", args: [id] });
+  const result = await client.execute({ sql: "SELECT * FROM activities WHERE id = ? AND user_id = ?", args: [id, userId] });
   return result.rows[0] ? mapRow(result.rows[0]) : null;
 }
 
 export async function patchActivity(
   id: number,
-  patch: Partial<Pick<Activity, "announced" | "thumbnail_ready">>
+  patch: Partial<Pick<Activity, "announced" | "thumbnail_ready">>,
+  userId: string
 ): Promise<Activity | null> {
   await ensureDb();
   const fields: string[] = [];
-  const args: Record<string, InValue> = { id };
+  const args: Record<string, InValue> = { id, user_id: userId };
   if (patch.announced !== undefined) {
     fields.push("announced = :announced");
     args.announced = patch.announced ? 1 : 0;
@@ -184,8 +187,8 @@ export async function patchActivity(
     args.thumbnail_ready = patch.thumbnail_ready ? 1 : 0;
   }
   if (fields.length === 0) return null;
-  await client.execute({ sql: `UPDATE activities SET ${fields.join(", ")} WHERE id = :id`, args });
-  const result = await client.execute({ sql: "SELECT * FROM activities WHERE id = ?", args: [id] });
+  await client.execute({ sql: `UPDATE activities SET ${fields.join(", ")} WHERE id = :id AND user_id = :user_id`, args });
+  const result = await client.execute({ sql: "SELECT * FROM activities WHERE id = ? AND user_id = ?", args: [id, userId] });
   return result.rows[0] ? mapRow(result.rows[0]) : null;
 }
 
@@ -238,28 +241,28 @@ export async function getStartupPrepNotifications(): Promise<Activity[]> {
   return result.rows.map(mapRow);
 }
 
-export async function getSetting(key: string): Promise<string | null> {
+export async function getSetting(key: string, userId: string): Promise<string | null> {
   await ensureDb();
   const result = await client.execute({
     sql: "SELECT value FROM settings WHERE key = ?",
-    args: [key],
+    args: [`${userId}:${key}`],
   });
   return result.rows[0] ? (result.rows[0].value as string) : null;
 }
 
-export async function setSetting(key: string, value: string): Promise<void> {
+export async function setSetting(key: string, value: string, userId: string): Promise<void> {
   await ensureDb();
   await client.execute({
     sql: "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-    args: [key, value],
+    args: [`${userId}:${key}`, value],
   });
 }
 
-export async function deleteActivity(id: number): Promise<boolean> {
+export async function deleteActivity(id: number, userId: string): Promise<boolean> {
   await ensureDb();
   const result = await client.execute({
-    sql: "DELETE FROM activities WHERE id = ?",
-    args: [id],
+    sql: "DELETE FROM activities WHERE id = ? AND user_id = ?",
+    args: [id, userId],
   });
   return result.rowsAffected > 0;
 }

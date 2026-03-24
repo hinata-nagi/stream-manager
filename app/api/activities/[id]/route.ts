@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { updateActivity, deleteActivity, patchActivity, ActivityInput, ActivityType, StreamPlatform } from "@/lib/db";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   try {
     const { id: idStr } = await params;
     const id = Number(idStr);
@@ -46,7 +49,7 @@ export async function PUT(
       thumbnail_ready: isStream ? !!thumbnail_ready : false,
       thumbnail_path: isStream ? (thumbnail_path || undefined) : undefined,
     };
-    const activity = await updateActivity(id, input);
+    const activity = await updateActivity(id, input, userId);
     if (!activity) {
       return NextResponse.json({ error: "見つかりません" }, { status: 404 });
     }
@@ -61,6 +64,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   try {
     const { id: idStr } = await params;
     const id = Number(idStr);
@@ -74,7 +79,7 @@ export async function PATCH(
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
     }
-    const activity = await patchActivity(id, patch);
+    const activity = await patchActivity(id, patch, userId);
     if (!activity) {
       return NextResponse.json({ error: "見つかりません" }, { status: 404 });
     }
@@ -89,6 +94,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   try {
     const { id: idStr } = await params;
     const id = Number(idStr);
@@ -96,7 +103,7 @@ export async function DELETE(
       return NextResponse.json({ error: "不正なIDです" }, { status: 400 });
     }
 
-    const deleted = await deleteActivity(id);
+    const deleted = await deleteActivity(id, userId);
     if (!deleted) {
       return NextResponse.json({ error: "見つかりません" }, { status: 404 });
     }
