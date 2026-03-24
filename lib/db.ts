@@ -258,6 +258,34 @@ export async function setSetting(key: string, value: string, userId: string): Pr
   });
 }
 
+export interface Template {
+  id: string;
+  name: string;
+  title: string;
+  memo: string;
+  type: ActivityType;
+  stream_platform: StreamPlatform;
+  twitch_url: string;
+  youtube_url: string;
+  collab_partner: string;
+  announced: boolean;
+  thumbnail_ready: boolean;
+}
+
+export async function getTemplates(userId: string): Promise<Template[]> {
+  const raw = await getSetting("templates", userId);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as Template[];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveTemplates(templates: Template[], userId: string): Promise<void> {
+  await setSetting("templates", JSON.stringify(templates), userId);
+}
+
 export async function deleteActivity(id: number, userId: string): Promise<boolean> {
   await ensureDb();
   const result = await client.execute({

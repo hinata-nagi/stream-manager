@@ -54,6 +54,20 @@ const emptyForm = () => ({
   thumbnail_path: "",
 });
 
+interface Template {
+  id: string;
+  name: string;
+  title: string;
+  memo: string;
+  type: ActivityType;
+  stream_platform: StreamPlatform;
+  twitch_url: string;
+  youtube_url: string;
+  collab_partner: string;
+  announced: boolean;
+  thumbnail_ready: boolean;
+}
+
 type FilterType = "すべて" | ActivityType;
 
 export default function Home() {
@@ -66,10 +80,12 @@ export default function Home() {
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("すべて");
-  const [todayOnly, setTodayOnly] = useState(false);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookSaved, setWebhookSaved] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const [form, setForm] = useState(emptyForm());
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -82,8 +98,15 @@ export default function Home() {
     }
   }
 
+  async function fetchTemplates() {
+    const res = await fetch("/api/templates");
+    if (res.ok) setTemplates(await res.json());
+  }
+
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
     fetchActivities();
+    fetchTemplates();
     fetch("/api/settings")
       .then((r) => r.json())
       .then((d) => setWebhookUrl(d.discord_webhook_url ?? ""))
@@ -94,7 +117,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ startup: true }),
     }).catch(() => {});
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -171,6 +194,65 @@ export default function Home() {
     setThumbnailFile(null);
     setError("");
     setSuccess("");
+  }
+
+  function loadTemplate(t: Template) {
+    setForm({
+      date: today(),
+      start_time: "",
+      end_time: "",
+      title: t.title,
+      type: t.type,
+      memo: t.memo,
+      stream_platform: t.stream_platform,
+      twitch_url: t.twitch_url,
+      youtube_url: t.youtube_url,
+      collab_partner: t.collab_partner,
+      announced: t.announced,
+      thumbnail_ready: t.thumbnail_ready,
+      thumbnail_path: "",
+    });
+    setEditingId(null);
+    setIsDuplicating(false);
+    setThumbnailFile(null);
+    setError("");
+    setSuccess("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function saveTemplate() {
+    if (!templateName.trim()) return;
+    const t: Template = {
+      id: crypto.randomUUID(),
+      name: templateName.trim(),
+      title: form.title,
+      memo: form.memo,
+      type: form.type,
+      stream_platform: form.stream_platform,
+      twitch_url: form.twitch_url,
+      youtube_url: form.youtube_url,
+      collab_partner: form.collab_partner,
+      announced: form.announced,
+      thumbnail_ready: form.thumbnail_ready,
+    };
+    const res = await fetch("/api/templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(t),
+    });
+    if (res.ok) {
+      setTemplates(await res.json());
+      setTemplateName("");
+    }
+  }
+
+  async function deleteTemplate(id: string) {
+    const res = await fetch("/api/templates", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) setTemplates(await res.json());
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -255,20 +337,20 @@ export default function Home() {
 
   const todayStr = today();
 
-  const filteredActivities = activities
+  const todayActivities = activities
     .filter((a) => {
       if (filterType !== "すべて" && a.type !== filterType) return false;
-      if (todayOnly && a.date !== todayStr) return false;
-      return true;
+      return a.date === todayStr;
+    })
+    .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
+
+  const otherActivities = activities
+    .filter((a) => {
+      if (filterType !== "すべて" && a.type !== filterType) return false;
+      return a.date !== todayStr;
     })
     .sort((a, b) => {
-      const bucket = (date: string) =>
-        date === todayStr ? 0 : date > todayStr ? 1 : 2;
-      const ba = bucket(a.date);
-      const bb = bucket(b.date);
-      if (ba !== bb) return ba - bb;
-      // 同じバケット内: 未来・今日は昇順、過去は降順
-      const dateOrder = ba === 2 ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
+      const dateOrder = b.date.localeCompare(a.date);
       if (dateOrder !== 0) return dateOrder;
       return (a.start_time || "").localeCompare(b.start_time || "");
     });
@@ -297,6 +379,99 @@ export default function Home() {
     );
   }
 
+  const renderCard = (a: Activity) => (
+    <li
+      key={a.id}
+      className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3"
+    >
+      {a.thumbnail_path && (
+        <img
+          src={a.thumbnail_path}
+          alt="サムネ"
+          onClick={() => setPreviewSrc(a.thumbnail_path)}
+          className="w-20 h-14 object-cover rounded shrink-0 border border-gray-100 cursor-zoom-in"
+        />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-gray-800">{a.title}</span>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${TYPE_COLORS[a.type]}`}>
+            {a.type}
+          </span>
+        </div>
+        <div className="text-xs text-gray-500 mt-0.5">
+          {a.date}
+          {a.start_time && ` \u00a0 ${a.start_time} – ${a.end_time}`}
+        </div>
+        {a.type === "配信" && (
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+            {a.stream_platform && (
+              <span className="text-xs text-gray-500">{a.stream_platform}</span>
+            )}
+            {a.twitch_url && (
+              <a href={a.twitch_url} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-purple-600 hover:underline">
+                Twitch
+              </a>
+            )}
+            {a.youtube_url && (
+              <a href={a.youtube_url} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-red-500 hover:underline">
+                YouTube
+              </a>
+            )}
+            {a.collab_partner && (
+              <span className="text-xs text-gray-500">コラボ: {a.collab_partner}</span>
+            )}
+            <button
+              onClick={() => toggleField(a.id, "announced", a.announced)}
+              className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
+                a.announced
+                  ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
+                  : "border-gray-300 bg-white text-gray-400 hover:bg-gray-50"
+              }`}
+            >
+              告知{a.announced ? "済✓" : "未"}
+            </button>
+            <button
+              onClick={() => toggleField(a.id, "thumbnail_ready", a.thumbnail_ready)}
+              className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
+                a.thumbnail_ready
+                  ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
+                  : "border-gray-300 bg-white text-gray-400 hover:bg-gray-50"
+              }`}
+            >
+              サムネ{a.thumbnail_ready ? "済✓" : "未"}
+            </button>
+          </div>
+        )}
+        {a.memo && (
+          <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap">{a.memo}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          onClick={() => startEdit(a)}
+          className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+        >
+          編集
+        </button>
+        <button
+          onClick={() => startDuplicate(a)}
+          className="text-xs text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 transition-colors"
+        >
+          複製
+        </button>
+        <button
+          onClick={() => setDeleteTargetId(a.id)}
+          className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+        >
+          削除
+        </button>
+      </div>
+    </li>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -315,6 +490,64 @@ export default function Home() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+        {/* Templates */}
+        <section className="bg-white rounded-lg border border-gray-200">
+          <button
+            type="button"
+            onClick={() => setShowTemplates((v) => !v)}
+            className="w-full flex items-center justify-between px-6 py-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors rounded-lg"
+          >
+            <span>テンプレート</span>
+            <span className="text-gray-400 text-xs">{showTemplates ? "▲" : "▼"}</span>
+          </button>
+          {showTemplates && (
+            <div className="px-6 pb-5 border-t border-gray-100 space-y-3">
+              {templates.length === 0 ? (
+                <p className="text-sm text-gray-400 pt-3">テンプレートがありません</p>
+              ) : (
+                <ul className="space-y-2 pt-3">
+                  {templates.map((t) => (
+                    <li key={t.id} className="flex items-center gap-2">
+                      <span className="flex-1 text-sm text-gray-700 truncate">{t.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => loadTemplate(t)}
+                        className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors shrink-0"
+                      >
+                        読み込み
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteTemplate(t.id)}
+                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors shrink-0"
+                      >
+                        削除
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="テンプレート名を入力して保存"
+                  className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={saveTemplate}
+                  disabled={!templateName.trim()}
+                  className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-800 disabled:opacity-40 text-white rounded-md transition-colors shrink-0"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
         {/* Form */}
         <section className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-base font-semibold text-gray-700 mb-4">
@@ -536,146 +769,42 @@ export default function Home() {
           </form>
         </section>
 
-        {/* List */}
+        {/* Today */}
+        <section>
+          <h2 className="text-base font-semibold text-gray-700 mb-3">今日の予定</h2>
+          {todayActivities.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">今日の予定はありません</p>
+          ) : (
+            <ul className="space-y-2">{todayActivities.map(renderCard)}</ul>
+          )}
+        </section>
+
+        {/* All (excluding today) */}
         <section>
           <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-            <h2 className="text-base font-semibold text-gray-700">一覧</h2>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex rounded-md overflow-hidden border border-gray-300 text-sm">
-                {(["すべて", "配信", "作業", "休み"] as FilterType[]).map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setFilterType(f)}
-                    className={`px-3 py-1 transition-colors ${
-                      filterType === f
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-              <label className="flex items-center gap-1.5 cursor-pointer select-none text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={todayOnly}
-                  onChange={(e) => setTodayOnly(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                今日のみ
-              </label>
+            <h2 className="text-base font-semibold text-gray-700">すべての予定</h2>
+            <div className="flex rounded-md overflow-hidden border border-gray-300 text-sm">
+              {(["すべて", "配信", "作業", "休み"] as FilterType[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilterType(f)}
+                  className={`px-3 py-1 transition-colors ${
+                    filterType === f
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
             </div>
           </div>
-          {filteredActivities.length === 0 ? (
+          {otherActivities.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">
               {activities.length === 0 ? "まだ予定がありません" : "該当する予定がありません"}
             </p>
           ) : (
-            <ul className="space-y-2">
-              {filteredActivities.map((a) => (
-                <li
-                  key={a.id}
-                  className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-start gap-3"
-                >
-                  {a.thumbnail_path && (
-                    <img
-                      src={a.thumbnail_path}
-                      alt="サムネ"
-                      onClick={() => setPreviewSrc(a.thumbnail_path)}
-                      className="w-20 h-14 object-cover rounded shrink-0 border border-gray-100 cursor-zoom-in"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-gray-800">{a.title}</span>
-                      <span
-                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${TYPE_COLORS[a.type]}`}
-                      >
-                        {a.type}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {a.date}
-                      {a.start_time && ` \u00a0 ${a.start_time} – ${a.end_time}`}
-                    </div>
-                    {a.type === "配信" && (
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                        {a.stream_platform && (
-                          <span className="text-xs text-gray-500">{a.stream_platform}</span>
-                        )}
-                        {a.twitch_url && (
-                          <a
-                            href={a.twitch_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-purple-600 hover:underline"
-                          >
-                            Twitch
-                          </a>
-                        )}
-                        {a.youtube_url && (
-                          <a
-                            href={a.youtube_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-red-500 hover:underline"
-                          >
-                            YouTube
-                          </a>
-                        )}
-                        {a.collab_partner && (
-                          <span className="text-xs text-gray-500">コラボ: {a.collab_partner}</span>
-                        )}
-                        <button
-                          onClick={() => toggleField(a.id, "announced", a.announced)}
-                          className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
-                            a.announced
-                              ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
-                              : "border-gray-300 bg-white text-gray-400 hover:bg-gray-50"
-                          }`}
-                        >
-                          告知{a.announced ? "済✓" : "未"}
-                        </button>
-                        <button
-                          onClick={() => toggleField(a.id, "thumbnail_ready", a.thumbnail_ready)}
-                          className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
-                            a.thumbnail_ready
-                              ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
-                              : "border-gray-300 bg-white text-gray-400 hover:bg-gray-50"
-                          }`}
-                        >
-                          サムネ{a.thumbnail_ready ? "済✓" : "未"}
-                        </button>
-                      </div>
-                    )}
-                    {a.memo && (
-                      <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap">{a.memo}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => startEdit(a)}
-                      className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-                    >
-                      編集
-                    </button>
-                    <button
-                      onClick={() => startDuplicate(a)}
-                      className="text-xs text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 transition-colors"
-                    >
-                      複製
-                    </button>
-                    <button
-                      onClick={() => setDeleteTargetId(a.id)}
-                      className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                    >
-                      削除
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <ul className="space-y-2">{otherActivities.map(renderCard)}</ul>
           )}
         </section>
 
