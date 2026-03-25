@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useRef, FormEvent } from "react";
 import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 
 type ActivityType = "配信" | "作業" | "休み";
@@ -54,6 +54,138 @@ const emptyForm = () => ({
   thumbnail_path: "",
 });
 
+const APP_VERSION = "v1.2";
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTE_OPTIONS = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+
+const splitTime = (t: string) => {
+  const [h = "", m = ""] = t.split(":");
+  return { h, m };
+};
+const joinTime = (h: string, m: string) => {
+  if (!h && !m) return "";
+  return `${h}:${m}`;
+};
+
+const formatDate = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+function getWeekDates(offsetWeeks: number): string[] {
+  const d = new Date();
+  const dow = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1) + offsetWeeks * 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    return formatDate(day);
+  });
+}
+
+const TYPE_RANK: Record<ActivityType, number> = { 配信: 0, 作業: 1, 休み: 2 };
+
+function pickForDay(activities: Activity[], dateStr: string): Activity | null {
+  return (
+    activities
+      .filter((a) => a.date === dateStr)
+      .sort(
+        (a, b) =>
+          TYPE_RANK[a.type] - TYPE_RANK[b.type] ||
+          (a.start_time || "").localeCompare(b.start_time || "")
+      )[0] ?? null
+  );
+}
+
+
+interface ScheduleTemplate {
+  id: string;
+  name: string;
+  description: string;
+  previewImage: string;
+  author: { name: string; url: string };
+  font: string;
+  textColor: string;
+  fontSizes: { time: number; title: number; empty: number };
+  layout: {
+    canvasWidth: number;
+    canvasHeight: number;
+    backgroundImage: string;
+    days: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      paddingLeft: number;
+      paddingRight: number;
+      timeOffsetX: number;
+      textBaseline: number;
+      dateX?: number;
+      dateY?: number;
+      dateFontSize?: number;
+    }[];
+    mainImage: { x: number; y: number; width: number; height: number };
+  };
+}
+
+const SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
+  {
+    id: "default",
+    name: "デフォルト",
+    description: "",
+    previewImage: "",
+    author: { name: "", url: "" },
+    font: "sans-serif",
+    textColor: "#f1f5f9",
+    fontSizes: { time: 12, title: 15, empty: 14 },
+    layout: {
+      canvasWidth: 1200,
+      canvasHeight: 630,
+      backgroundImage: "",
+      mainImage: { x: 580, y: 0, width: 620, height: 630 },
+      days: [
+        { x: 0, y:  72, width: 580, height: 80, paddingLeft: 148, paddingRight: 16, timeOffsetX: 62, textBaseline: 50 },
+        { x: 0, y: 152, width: 580, height: 80, paddingLeft: 148, paddingRight: 16, timeOffsetX: 62, textBaseline: 50 },
+        { x: 0, y: 231, width: 580, height: 80, paddingLeft: 148, paddingRight: 16, timeOffsetX: 62, textBaseline: 50 },
+        { x: 0, y: 311, width: 580, height: 80, paddingLeft: 148, paddingRight: 16, timeOffsetX: 62, textBaseline: 50 },
+        { x: 0, y: 391, width: 580, height: 80, paddingLeft: 148, paddingRight: 16, timeOffsetX: 62, textBaseline: 50 },
+        { x: 0, y: 471, width: 580, height: 80, paddingLeft: 148, paddingRight: 16, timeOffsetX: 62, textBaseline: 50 },
+        { x: 0, y: 550, width: 580, height: 80, paddingLeft: 148, paddingRight: 16, timeOffsetX: 62, textBaseline: 50 },
+      ],
+    },
+  },
+  {
+    id: "black-red",
+    name: "黒赤テンプレ",
+    description: "",
+    previewImage: "",
+    author: { name: "", url: "" },
+    font: "sans-serif",
+    textColor: "#000000ff",
+    fontSizes: { time: 36, title: 30, empty: 26 },
+    layout: {
+      canvasWidth: 1920,
+      canvasHeight: 1080,
+      // /public/templates/ に置いた画像のファイル名に合わせて変更する
+      backgroundImage: "/templates/template_01.png",
+      mainImage: { x: 960, y: 0, width: 960, height: 1080 },
+      days: [
+        { x: 0, y: 140, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
+        { x: 0, y: 270, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
+        { x: 0, y: 400, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
+        { x: 0, y: 530, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
+        { x: 0, y: 663, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
+        { x: 0, y: 792, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
+        { x: 0, y: 925, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
+      ],
+    },
+  },
+];
+
 interface Template {
   id: string;
   name: string;
@@ -83,6 +215,14 @@ export default function Home() {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookSaved, setWebhookSaved] = useState(false);
+  const [showScheduleGen, setShowScheduleGen] = useState(false);
+  const [scheduleWeekOffset, setScheduleWeekOffset] = useState<0 | 1>(0);
+  const [scheduleMainImageFile, setScheduleMainImageFile] = useState<File | null>(null);
+  const [scheduleCanvasReady, setScheduleCanvasReady] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(SCHEDULE_TEMPLATES[0].id);
+  const [scheduleFont, setScheduleFont] = useState(SCHEDULE_TEMPLATES[0].font);
+  const [scheduleDebug, setScheduleDebug] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateName, setTemplateName] = useState("");
   const [showTemplates, setShowTemplates] = useState(false);
@@ -110,13 +250,13 @@ export default function Home() {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((d) => setWebhookUrl(d.discord_webhook_url ?? ""))
-      .catch(() => {});
+      .catch(() => { });
     // 起動時通知（24時間以内の準備未完了チェック）
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ startup: true }),
-    }).catch(() => {});
+    }).catch(() => { });
   }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
@@ -125,7 +265,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
-      }).catch(() => {});
+      }).catch(() => { });
     }, 60_000);
     return () => clearInterval(id);
   }, []);
@@ -255,6 +395,13 @@ export default function Home() {
     if (res.ok) setTemplates(await res.json());
   }
 
+  function selectTemplate(id: string) {
+    setSelectedTemplateId(id);
+    const t = SCHEDULE_TEMPLATES.find((t) => t.id === id) ?? SCHEDULE_TEMPLATES[0];
+    setScheduleFont(t.font);
+    setScheduleCanvasReady(false);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
@@ -262,6 +409,23 @@ export default function Home() {
     setLoading(true);
 
     try {
+      if (form.type !== "休み") {
+        const { h: sh, m: sm } = splitTime(form.start_time);
+        const { h: eh, m: em } = splitTime(form.end_time);
+        const toNum = (s: string) => parseInt(s, 10);
+        const invalid =
+          !sh || !sm || !eh || !em ||
+          isNaN(toNum(sh)) || toNum(sh) < 0 || toNum(sh) > 23 ||
+          isNaN(toNum(sm)) || toNum(sm) < 0 || toNum(sm) > 59 ||
+          isNaN(toNum(eh)) || toNum(eh) < 0 || toNum(eh) > 23 ||
+          isNaN(toNum(em)) || toNum(em) < 0 || toNum(em) > 59;
+        if (invalid) {
+          setError("時間の入力値が正しくありません（時: 00〜23、分: 00〜59）");
+          setLoading(false);
+          return;
+        }
+      }
+
       let uploadedPath = form.thumbnail_path;
       if (thumbnailFile) {
         const fd = new FormData();
@@ -333,6 +497,217 @@ export default function Home() {
     } finally {
       setDeleteTargetId(null);
     }
+  }
+
+  async function generateScheduleImage() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const tmpl = SCHEDULE_TEMPLATES.find((t) => t.id === selectedTemplateId) ?? SCHEDULE_TEMPLATES[0];
+    const { layout, textColor, fontSizes } = tmpl;
+    const font = scheduleFont;
+    const W = layout.canvasWidth;
+    const H = layout.canvasHeight;
+    const SPLIT = layout.mainImage.x;
+
+    canvas.width = W;
+    canvas.height = H;
+
+    const weekDates = getWeekDates(scheduleWeekOffset);
+    const DAYS_JA = ["月", "火", "水", "木", "金", "土", "日"];
+
+    // ① 背景：テンプレ画像 or プログラム描画（フォールバック）
+    if (layout.backgroundImage) {
+      const bgImg = new Image();
+      bgImg.src = layout.backgroundImage;
+      await new Promise<void>((resolve) => { bgImg.onload = () => resolve(); });
+      ctx.drawImage(bgImg, 0, 0, W, H);
+    } else {
+      const HEADER_H = layout.days[0].y;
+      const BADGE_COLORS: Record<string, string> = {
+        配信: "#ef4444", 作業: "#3b82f6", 休み: "#22c55e",
+      };
+
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(0, 0, W, H);
+
+      // ヘッダー
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(0, 0, SPLIT, HEADER_H);
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = "bold 24px sans-serif";
+      ctx.fillText("週間スケジュール", 24, 40);
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "13px sans-serif";
+      ctx.fillText(
+        `${weekDates[0].slice(5).replace("-", "/")} 〜 ${weekDates[6].slice(5).replace("-", "/")}`,
+        24, 60
+      );
+
+      // 行背景・区切り・曜日・日付・バッジ
+      for (let i = 0; i < 7; i++) {
+        const slot = layout.days[i];
+        const activity = pickForDay(activities, weekDates[i]);
+        const { x, y, width, height, textBaseline } = slot;
+        const midY = y + textBaseline;
+
+        ctx.fillStyle = i % 2 === 0 ? "#111827" : "#0d1526";
+        ctx.fillRect(x, y, width, height);
+
+        ctx.strokeStyle = "#1e293b";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, y + height);
+        ctx.lineTo(x + width, y + height);
+        ctx.stroke();
+
+        const dayColor = i === 5 ? "#60a5fa" : i === 6 ? "#f87171" : "#e2e8f0";
+        ctx.fillStyle = dayColor;
+        ctx.font = "bold 20px sans-serif";
+        ctx.fillText(DAYS_JA[i], 16, midY);
+
+        ctx.fillStyle = "#64748b";
+        ctx.font = "13px sans-serif";
+        ctx.fillText(weekDates[i].slice(5).replace("-", "/"), 42, midY);
+
+        if (activity) {
+          const badgeColor = BADGE_COLORS[activity.type] ?? "#6b7280";
+          ctx.fillStyle = badgeColor;
+          ctx.fillRect(96, Math.round(y + height * 0.22), 44, 22);
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(activity.type, 118, Math.round(y + height * 0.22) + 15);
+          ctx.textAlign = "left";
+        }
+      }
+
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(SPLIT, 0);
+      ctx.lineTo(SPLIT, H);
+      ctx.stroke();
+    }
+
+    // ② メイン画像（clip + cover fit）
+    if (scheduleMainImageFile) {
+      const img = new Image();
+      img.src = URL.createObjectURL(scheduleMainImageFile);
+      await new Promise<void>((resolve) => { img.onload = () => resolve(); });
+      const { x, y, width, height } = layout.mainImage;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, width, height);
+      ctx.clip();
+      const scale = Math.max(width / img.width, height / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      ctx.drawImage(img, x + (width - dw) / 2, y + (height - dh) / 2, dw, dh);
+      ctx.restore();
+      if (!layout.backgroundImage) {
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillRect(layout.mainImage.x, 0, W - SPLIT, H);
+      }
+    } else if (!layout.backgroundImage) {
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(SPLIT, 0, W - SPLIT, H);
+      ctx.fillStyle = "#475569";
+      ctx.font = "16px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("画像未選択", SPLIT + (W - SPLIT) / 2, H / 2);
+      ctx.textAlign = "left";
+    }
+
+    // デバッグ枠線（scheduleDebug が true のときのみ描画）
+    if (scheduleDebug) {
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 7; i++) {
+        const { x, y, width, height } = layout.days[i];
+        ctx.strokeStyle = "rgba(255, 60, 60, 0.8)";
+        ctx.strokeRect(x, y, width, height);
+        ctx.fillStyle = "rgba(255, 60, 60, 0.6)";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText(`days[${i}] y=${y} h=${height}`, x + 4, y + 18);
+      }
+      const mi = layout.mainImage;
+      ctx.strokeStyle = "rgba(0, 210, 255, 0.9)";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(mi.x, mi.y, mi.width, mi.height);
+      ctx.fillStyle = "rgba(0, 210, 255, 0.8)";
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillText(`mainImage x=${mi.x} y=${mi.y} w=${mi.width} h=${mi.height}`, mi.x + 4, mi.y + 20);
+    }
+
+    // ③ テキストオーバーレイ（テンプレ座標ベース）
+    ctx.fillStyle = textColor;
+    for (let i = 0; i < 7; i++) {
+      const { x, y, width, paddingLeft, paddingRight, timeOffsetX, textBaseline, dateX, dateY, dateFontSize } = layout.days[i];
+      const activity = pickForDay(activities, weekDates[i]);
+      const textY = y + textBaseline;
+
+      if (dateX !== undefined && dateY !== undefined) {
+        const dateStr = weekDates[i].slice(5).replace("-", "/");
+        const dateDrawX = x + dateX;
+        const dateDrawY = y + dateY;
+        ctx.font = `bold ${dateFontSize ?? fontSizes.time}px ${font}`;
+        ctx.textAlign = "center";
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#ffffff";
+        ctx.strokeText(dateStr, dateDrawX, dateDrawY);
+        ctx.fillStyle = "#000000";
+        ctx.fillText(dateStr, dateDrawX, dateDrawY);
+        ctx.textAlign = "left";
+      }
+
+      const textCenterX = x + paddingLeft + (width - paddingLeft - paddingRight) / 2;
+
+      if (!activity) {
+        ctx.font = `${fontSizes.empty}px ${font}`;
+        ctx.textAlign = "center";
+        ctx.fillText("予定なし", textCenterX + 20, textY);
+        ctx.textAlign = "left";
+        continue;
+      }
+
+      let titleX = x + paddingLeft;
+      if (activity.start_time && activity.type !== "休み") {
+        ctx.font = `bold ${fontSizes.time}px ${font}`;
+        ctx.textAlign = "left";
+        const time = activity.start_time;
+        const colonIndex = time.indexOf(":");
+        const beforeColon = colonIndex >= 0 ? time.slice(0, colonIndex) : "";
+        const colonOffset = ctx.measureText(beforeColon).width;
+        ctx.fillText(time, x + paddingLeft - colonOffset + 10, textY);
+        titleX = x + paddingLeft + timeOffsetX;
+      }
+
+      ctx.font = `bold ${fontSizes.title}px ${font}`;
+      const maxW = (x + width - paddingRight) - titleX;
+      let title = activity.title;
+      while (ctx.measureText(title + "…").width > maxW && title.length > 0) {
+        title = title.slice(0, -1);
+      }
+      ctx.textAlign = "center";
+      ctx.fillText(
+        title.length < activity.title.length ? title + "…" : title,
+        textCenterX + 60, textY
+      );
+      ctx.textAlign = "left";
+    }
+
+    setScheduleCanvasReady(true);
+  }
+
+  function downloadSchedule() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const weekDates = getWeekDates(scheduleWeekOffset);
+    const link = document.createElement("a");
+    link.download = `schedule-${weekDates[0]}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   }
 
   const todayStr = today();
@@ -425,21 +800,19 @@ export default function Home() {
             )}
             <button
               onClick={() => toggleField(a.id, "announced", a.announced)}
-              className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
-                a.announced
-                  ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
-                  : "border-gray-300 bg-white text-gray-400 hover:bg-gray-50"
-              }`}
+              className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${a.announced
+                ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
+                : "border-gray-300 bg-white text-gray-400 hover:bg-gray-50"
+                }`}
             >
               告知{a.announced ? "済✓" : "未"}
             </button>
             <button
               onClick={() => toggleField(a.id, "thumbnail_ready", a.thumbnail_ready)}
-              className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
-                a.thumbnail_ready
-                  ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
-                  : "border-gray-300 bg-white text-gray-400 hover:bg-gray-50"
-              }`}
+              className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${a.thumbnail_ready
+                ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
+                : "border-gray-300 bg-white text-gray-400 hover:bg-gray-50"
+                }`}
             >
               サムネ{a.thumbnail_ready ? "済✓" : "未"}
             </button>
@@ -475,7 +848,10 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-800">活動管理</h1>
+        <h1 className="text-xl font-semibold text-gray-800">
+          活動管理
+          <span className="ml-1.5 text-sm font-normal text-gray-400">{APP_VERSION}</span>
+        </h1>
         <div>
           {isSignedIn ? (
             <UserButton />
@@ -583,23 +959,83 @@ export default function Home() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">開始時間 *</label>
-                  <input
-                    type="time"
-                    value={form.start_time}
-                    onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                    required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      list="start-hour-candidates"
+                      value={splitTime(form.start_time).h}
+                      onChange={(e) => setForm({ ...form, start_time: joinTime(e.target.value, splitTime(form.start_time).m) })}
+                      onBlur={(e) => {
+                        const v = e.target.value;
+                        if (/^\d$/.test(v)) setForm({ ...form, start_time: joinTime(v.padStart(2, "0"), splitTime(form.start_time).m) });
+                      }}
+                      placeholder="00"
+                      maxLength={2}
+                      className="w-14 border border-gray-300 rounded-md px-2 py-2 text-sm text-gray-900 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <datalist id="start-hour-candidates">
+                      {HOUR_OPTIONS.map((h) => <option key={h} value={h} />)}
+                    </datalist>
+                    <span className="text-gray-400 text-sm select-none">:</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      list="start-minute-candidates"
+                      value={splitTime(form.start_time).m}
+                      onChange={(e) => setForm({ ...form, start_time: joinTime(splitTime(form.start_time).h, e.target.value) })}
+                      onBlur={(e) => {
+                        const v = e.target.value;
+                        if (/^\d$/.test(v)) setForm({ ...form, start_time: joinTime(splitTime(form.start_time).h, v.padStart(2, "0")) });
+                      }}
+                      placeholder="00"
+                      maxLength={2}
+                      className="w-14 border border-gray-300 rounded-md px-2 py-2 text-sm text-gray-900 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <datalist id="start-minute-candidates">
+                      {MINUTE_OPTIONS.map((m) => <option key={m} value={m} />)}
+                    </datalist>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">終了時間 *</label>
-                  <input
-                    type="time"
-                    value={form.end_time}
-                    onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                    required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      list="end-hour-candidates"
+                      value={splitTime(form.end_time).h}
+                      onChange={(e) => setForm({ ...form, end_time: joinTime(e.target.value, splitTime(form.end_time).m) })}
+                      onBlur={(e) => {
+                        const v = e.target.value;
+                        if (/^\d$/.test(v)) setForm({ ...form, end_time: joinTime(v.padStart(2, "0"), splitTime(form.end_time).m) });
+                      }}
+                      placeholder="00"
+                      maxLength={2}
+                      className="w-14 border border-gray-300 rounded-md px-2 py-2 text-sm text-gray-900 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <datalist id="end-hour-candidates">
+                      {HOUR_OPTIONS.map((h) => <option key={h} value={h} />)}
+                    </datalist>
+                    <span className="text-gray-400 text-sm select-none">:</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      list="end-minute-candidates"
+                      value={splitTime(form.end_time).m}
+                      onChange={(e) => setForm({ ...form, end_time: joinTime(splitTime(form.end_time).h, e.target.value) })}
+                      onBlur={(e) => {
+                        const v = e.target.value;
+                        if (/^\d$/.test(v)) setForm({ ...form, end_time: joinTime(splitTime(form.end_time).h, v.padStart(2, "0")) });
+                      }}
+                      placeholder="00"
+                      maxLength={2}
+                      className="w-14 border border-gray-300 rounded-md px-2 py-2 text-sm text-gray-900 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <datalist id="end-minute-candidates">
+                      {MINUTE_OPTIONS.map((m) => <option key={m} value={m} />)}
+                    </datalist>
+                  </div>
                 </div>
               </div>
             )}
@@ -788,11 +1224,10 @@ export default function Home() {
                 <button
                   key={f}
                   onClick={() => setFilterType(f)}
-                  className={`px-3 py-1 transition-colors ${
-                    filterType === f
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-600 hover:bg-gray-50"
-                  }`}
+                  className={`px-3 py-1 transition-colors ${filterType === f
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
                 >
                   {f}
                 </button>
@@ -833,6 +1268,134 @@ export default function Home() {
               </button>
             </div>
           </div>
+        </section>
+
+        {/* Schedule Generator */}
+        <section className="bg-white rounded-lg border border-gray-200">
+          <button
+            type="button"
+            onClick={() => setShowScheduleGen((v) => !v)}
+            className="w-full flex items-center justify-between px-6 py-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors rounded-lg"
+          >
+            <span>スケジュール画像</span>
+            <span className="text-gray-400 text-xs">{showScheduleGen ? "▲" : "▼"}</span>
+          </button>
+          {showScheduleGen && (
+            <div className="px-6 pb-6 border-t border-gray-100 space-y-4 pt-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">テンプレート</label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => selectTemplate(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {SCHEDULE_TEMPLATES.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                {(() => {
+                  const t = SCHEDULE_TEMPLATES.find((t) => t.id === selectedTemplateId) ?? SCHEDULE_TEMPLATES[0];
+                  if (!t.layout.backgroundImage) {
+                    return <p className="mt-1.5 text-xs text-amber-600">テンプレ画像未設定</p>;
+                  }
+                  if (t.author.name) {
+                    return (
+                      <p className="mt-1.5 text-xs text-gray-500">
+                        テンプレ作者:{" "}
+                        {t.author.url ? (
+                          <a
+                            href={t.author.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {t.author.name}
+                          </a>
+                        ) : (
+                          t.author.name
+                        )}
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">フォント</label>
+                <select
+                  value={scheduleFont}
+                  onChange={(e) => { setScheduleFont(e.target.value); setScheduleCanvasReady(false); }}
+                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="sans-serif">sans-serif</option>
+                  <option value="serif">serif</option>
+                  <option value="monospace">monospace</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">対象週</label>
+                <div className="flex rounded-md overflow-hidden border border-gray-300 text-sm w-fit">
+                  {([0, 1] as const).map((offset) => (
+                    <button
+                      key={offset}
+                      type="button"
+                      onClick={() => { setScheduleWeekOffset(offset); setScheduleCanvasReady(false); }}
+                      className={`px-4 py-1.5 transition-colors ${scheduleWeekOffset === offset
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
+                    >
+                      {offset === 0 ? "今週" : "来週"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">メイン画像（右側）</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    setScheduleMainImageFile(e.target.files?.[0] ?? null);
+                    setScheduleCanvasReady(false);
+                  }}
+                  className="text-sm text-gray-600 file:mr-3 file:py-1 file:px-3 file:rounded file:border file:border-gray-300 file:text-sm file:bg-white file:text-gray-600 hover:file:bg-gray-50"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-600 select-none cursor-pointer w-fit">
+                <input
+                  type="checkbox"
+                  checked={scheduleDebug}
+                  onChange={(e) => setScheduleDebug(e.target.checked)}
+                  className="accent-red-500"
+                />
+                デバッグ枠線を表示（座標確認用）
+              </label>
+              <button
+                type="button"
+                onClick={generateScheduleImage}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
+              >
+                プレビュー生成
+              </button>
+              <div className="overflow-x-auto">
+                <canvas
+                  ref={canvasRef}
+                  className="rounded border border-gray-200 max-w-full"
+                  style={{ display: scheduleCanvasReady ? "block" : "none" }}
+                />
+              </div>
+              {scheduleCanvasReady && (
+                <button
+                  type="button"
+                  onClick={downloadSchedule}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium rounded-md transition-colors"
+                >
+                  ダウンロード
+                </button>
+              )}
+            </div>
+          )}
         </section>
       </main>
 
