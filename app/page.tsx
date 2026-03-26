@@ -676,7 +676,7 @@ export default function Home() {
       }
 
       let titleX = x + paddingLeft;
-      if (activity.type === "休み" || ((activity.type === "作業" || activity.type === "動画") && selectedTemplateId !== "black-red")) {
+      if (activity.type === "休み" || (activity.type === "動画" && selectedTemplateId !== "black-red")) {
         ctx.font = `bold ${fontSizes.time}px ${font}`;
         ctx.textAlign = "left";
         if (selectedTemplateId === "black-red") {
