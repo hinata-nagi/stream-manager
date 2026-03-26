@@ -800,7 +800,7 @@ export default function Home() {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-gray-800">{a.title}</span>
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${TYPE_COLORS[a.type]}`}>
-            {a.type === "作業" ? "動画" : a.type}
+            {a.type}
           </span>
         </div>
         <div className="text-xs text-gray-500 mt-0.5">
