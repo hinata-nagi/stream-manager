@@ -23,7 +23,7 @@ export async function PUT(
       return NextResponse.json({ error: "必須項目が不足しています" }, { status: 400 });
     }
 
-    const validTypes: ActivityType[] = ["配信", "作業", "休み"];
+    const validTypes: ActivityType[] = ["配信", "動画", "作業", "休み"];
     if (!validTypes.includes(type)) {
       return NextResponse.json({ error: "種別が不正です" }, { status: 400 });
     }

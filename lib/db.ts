@@ -18,7 +18,7 @@ async function ensureDb() {
       start_time TEXT NOT NULL,
       end_time TEXT NOT NULL,
       title TEXT NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('配信', '作業', '休み')),
+      type TEXT NOT NULL CHECK(type IN ('配信', '動画', '作業', '休み')),
       memo TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     )
@@ -55,7 +55,7 @@ async function ensureDb() {
   }
 }
 
-export type ActivityType = "配信" | "作業" | "休み";
+export type ActivityType = "配信" | "動画" | "作業" | "休み";
 export type StreamPlatform = "Twitch" | "YouTube" | "両方";
 
 export interface Activity {

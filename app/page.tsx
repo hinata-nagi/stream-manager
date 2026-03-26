@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 
-type ActivityType = "配信" | "作業" | "休み";
+type ActivityType = "配信" | "動画" | "休み";
 type StreamPlatform = "Twitch" | "YouTube" | "両方";
 
 interface Activity {
@@ -24,8 +24,9 @@ interface Activity {
   created_at: string;
 }
 
-const TYPE_COLORS: Record<ActivityType, string> = {
+const TYPE_COLORS: Record<string, string> = {
   配信: "bg-red-100 text-red-700",
+  動画: "bg-blue-100 text-blue-700",
   作業: "bg-blue-100 text-blue-700",
   休み: "bg-green-100 text-green-700",
 };
@@ -43,7 +44,7 @@ const emptyForm = () => ({
   start_time: "",
   end_time: "",
   title: "",
-  type: "作業" as ActivityType,
+  type: "動画" as ActivityType,
   memo: "",
   stream_platform: "Twitch" as StreamPlatform,
   twitch_url: "",
@@ -87,7 +88,7 @@ function getWeekDates(offsetWeeks: number): string[] {
   });
 }
 
-const TYPE_RANK: Record<ActivityType, number> = { 配信: 0, 作業: 1, 休み: 2 };
+const TYPE_RANK: Record<string, number> = { 配信: 0, 動画: 1, 作業: 1, 休み: 2 };
 
 function pickForDay(activities: Activity[], dateStr: string): Activity | null {
   return (
@@ -127,6 +128,9 @@ interface ScheduleTemplate {
       dateX?: number;
       dateY?: number;
       dateFontSize?: number;
+      titleCenterX?: number;
+      titleLeftLimit?: number;
+      titleRightLimit?: number;
     }[];
     mainImage: { x: number; y: number; width: number; height: number };
   };
@@ -174,13 +178,13 @@ const SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
       backgroundImage: "/templates/template_01.png",
       mainImage: { x: 960, y: 0, width: 960, height: 1080 },
       days: [
-        { x: 0, y: 140, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
-        { x: 0, y: 270, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
-        { x: 0, y: 400, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
-        { x: 0, y: 530, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
-        { x: 0, y: 663, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
-        { x: 0, y: 792, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
-        { x: 0, y: 925, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36 },
+        { x: 0, y: 140, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36, titleCenterX: 670, titleLeftLimit: 260, titleRightLimit: 860 },
+        { x: 0, y: 270, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36, titleCenterX: 670, titleLeftLimit: 260, titleRightLimit: 860 },
+        { x: 0, y: 400, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36, titleCenterX: 670, titleLeftLimit: 260, titleRightLimit: 860 },
+        { x: 0, y: 530, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36, titleCenterX: 670, titleLeftLimit: 260, titleRightLimit: 860 },
+        { x: 0, y: 663, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36, titleCenterX: 670, titleLeftLimit: 260, titleRightLimit: 860 },
+        { x: 0, y: 792, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36, titleCenterX: 670, titleLeftLimit: 260, titleRightLimit: 860 },
+        { x: 0, y: 925, width: 960, height: 134, paddingLeft: 260, paddingRight: 12, timeOffsetX: 180, textBaseline: 92, dateX: 108, dateY: 88, dateFontSize: 36, titleCenterX: 670, titleLeftLimit: 260, titleRightLimit: 860 },
       ],
     },
   },
@@ -527,7 +531,7 @@ export default function Home() {
     } else {
       const HEADER_H = layout.days[0].y;
       const BADGE_COLORS: Record<string, string> = {
-        配信: "#ef4444", 作業: "#3b82f6", 休み: "#22c55e",
+        配信: "#ef4444", 動画: "#3b82f6", 作業: "#3b82f6", 休み: "#22c55e",
       };
 
       ctx.fillStyle = "#0f172a";
@@ -643,7 +647,7 @@ export default function Home() {
     // ③ テキストオーバーレイ（テンプレ座標ベース）
     ctx.fillStyle = textColor;
     for (let i = 0; i < 7; i++) {
-      const { x, y, width, paddingLeft, paddingRight, timeOffsetX, textBaseline, dateX, dateY, dateFontSize } = layout.days[i];
+      const { x, y, width, paddingLeft, paddingRight, timeOffsetX, textBaseline, dateX, dateY, dateFontSize, titleCenterX, titleLeftLimit, titleRightLimit } = layout.days[i];
       const activity = pickForDay(activities, weekDates[i]);
       const textY = y + textBaseline;
 
@@ -672,7 +676,16 @@ export default function Home() {
       }
 
       let titleX = x + paddingLeft;
-      if (activity.start_time && activity.type !== "休み") {
+      if (activity.type === "休み" || ((activity.type === "作業" || activity.type === "動画") && selectedTemplateId !== "black-red")) {
+        ctx.font = `bold ${fontSizes.time}px ${font}`;
+        ctx.textAlign = "left";
+        if (selectedTemplateId === "black-red") {
+          ctx.fillText("OFF", x + paddingLeft - 20, textY);
+        } else {
+          ctx.fillText("OFF", x + paddingLeft, textY);
+        }
+        titleX = x + paddingLeft + timeOffsetX;
+      } else if (activity.start_time) {
         ctx.font = `bold ${fontSizes.time}px ${font}`;
         ctx.textAlign = "left";
         const time = activity.start_time;
@@ -683,18 +696,34 @@ export default function Home() {
         titleX = x + paddingLeft + timeOffsetX;
       }
 
-      ctx.font = `bold ${fontSizes.title}px ${font}`;
       const maxW = (x + width - paddingRight) - titleX;
-      let title = activity.title;
-      while (ctx.measureText(title + "…").width > maxW && title.length > 0) {
-        title = title.slice(0, -1);
+      ctx.font = `bold ${fontSizes.title}px ${font}`;
+
+      if (selectedTemplateId === "black-red" && titleCenterX != null && titleLeftLimit != null && titleRightLimit != null) {
+        const availableW = titleRightLimit - titleLeftLimit;
+        let title = activity.title;
+        while (ctx.measureText(title + "…").width > availableW && title.length > 0) {
+          title = title.slice(0, -1);
+        }
+        const displayTitle = title.length < activity.title.length ? title + "…" : title;
+        ctx.textAlign = "center";
+        ctx.fillText(displayTitle, titleCenterX, textY);
+        ctx.textAlign = "left";
+      } else {
+        let title = activity.title;
+        while (ctx.measureText(title + "…").width > maxW && title.length > 0) {
+          title = title.slice(0, -1);
+        }
+        const displayTitle = title.length < activity.title.length ? title + "…" : title;
+        if (selectedTemplateId === "black-red") {
+          ctx.textAlign = "center";
+          ctx.fillText(displayTitle, textCenterX + 60, textY);
+          ctx.textAlign = "left";
+        } else {
+          ctx.textAlign = "left";
+          ctx.fillText(displayTitle, titleX, textY);
+        }
       }
-      ctx.textAlign = "center";
-      ctx.fillText(
-        title.length < activity.title.length ? title + "…" : title,
-        textCenterX + 60, textY
-      );
-      ctx.textAlign = "left";
     }
 
     setScheduleCanvasReady(true);
@@ -771,7 +800,7 @@ export default function Home() {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-gray-800">{a.title}</span>
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${TYPE_COLORS[a.type]}`}>
-            {a.type}
+            {a.type === "作業" ? "動画" : a.type}
           </span>
         </div>
         <div className="text-xs text-gray-500 mt-0.5">
@@ -949,7 +978,7 @@ export default function Home() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option>配信</option>
-                  <option>作業</option>
+                  <option>動画</option>
                   <option>休み</option>
                 </select>
               </div>
@@ -1220,7 +1249,7 @@ export default function Home() {
           <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
             <h2 className="text-base font-semibold text-gray-700">すべての予定</h2>
             <div className="flex rounded-md overflow-hidden border border-gray-300 text-sm">
-              {(["すべて", "配信", "作業", "休み"] as FilterType[]).map((f) => (
+              {(["すべて", "配信", "動画", "休み"] as FilterType[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilterType(f)}
@@ -1295,6 +1324,9 @@ export default function Home() {
                 </select>
                 {(() => {
                   const t = SCHEDULE_TEMPLATES.find((t) => t.id === selectedTemplateId) ?? SCHEDULE_TEMPLATES[0];
+                  if (t.id === "black-red") {
+                    return <p className="mt-1.5 text-xs text-amber-600">黒赤テンプレは長いタイトルだと重なって見えることがあります。18文字前後を目安にしてください。</p>;
+                  }
                   if (!t.layout.backgroundImage) {
                     return <p className="mt-1.5 text-xs text-amber-600">テンプレ画像未設定</p>;
                   }
